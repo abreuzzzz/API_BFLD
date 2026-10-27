@@ -152,7 +152,7 @@ for col in df_consolidado.columns:
     print(f"  ✅ Coluna '{col}' convertida para string")
 
 # ===================== Buscar ID da planilha no Google Drive =====================
-folder_id = "1ePdiJo3o2Lr0cukI9Gj8v2fvQjFYT7rF"
+folder_id = "1qmhIsNiiy6Wm9WF94km2G3adH3wZtQHw"
 sheet_name = "Financeiro_contas_a_pagar_BFLD"
 
 query = f"name='{sheet_name}' and mimeType='application/vnd.google-apps.spreadsheet' and '{folder_id}' in parents and trashed=false"
