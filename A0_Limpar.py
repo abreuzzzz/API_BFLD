@@ -15,9 +15,9 @@ client = gspread.authorize(creds)
 
 # === IDs das planilhas ===
 planilhas_ids = {
-        "Financeiro_contas_a_receber_BFLD": "108kIIp0_k5XFpjlasbwZbl-MCankKhy0PiV9kkEE8ns",
-    "Financeiro_contas_a_pagar_BFLD": "1IKMBZ7vhay-kznsaOOadOYHM5O65SVadseGq0a0YTFk",
-    "Financeiro_Completo_BFLD": "1YB1C0VVRp_9AuhDjEBfqmV7OTjce3Ood5ZlfPMwF69Q"
+        "Financeiro_contas_a_receber_BFLD": "1v3vM6pyttTE7hZPObU0crX2bO_3NCbW8u56RyBlQceQ",
+    "Financeiro_contas_a_pagar_BFLD": "1UEIuV1hVAT-3aXYFzQX3s3Kg2zBbPxr3glCto9yTTFg",
+    "Financeiro_Completo_BFLD": "1w9k30vrjDG7_0yWZ8_ehMp9GpgkJ4QqWpvt6i7GG8P8"
 }
 
 def limpar_aba_completa(aba, nome_aba):
