@@ -209,6 +209,8 @@ if len(colunas_centro_custo) > 0 and len(colunas_valor) > 0:
 
     def localizar_coluna_valor(centro_col):
         sufixo = centro_col.replace('Centro de Custo ', '', 1).strip()
+
+        # 1) padrão novo: nome exato do valor, incluindo decimais como 1.1 / 1.2
         candidatos = [
             f'Valor no Centro de Custo {sufixo}',
             f'Valor no Centro de Custo {sufixo.replace(".", ".")}'
@@ -218,9 +220,17 @@ if len(colunas_centro_custo) > 0 and len(colunas_valor) > 0:
             if nome in df_completo_indexed.columns:
                 return nome
 
+        # 2) compatibilidade com nomes que terminam no mesmo sufixo
         for nome in df_completo_indexed.columns:
             if nome.startswith('Valor no Centro de Custo ') and nome.endswith(sufixo):
                 return nome
+
+        # 3) fallback da forma antiga: ordem sequencial (1, 2, 3...)
+        if centro_col in colunas_centro_custo:
+            indice_legacy = colunas_centro_custo.index(centro_col) + 1
+            nome_legacy = f'Valor no Centro de Custo {indice_legacy}'
+            if nome_legacy in df_completo_indexed.columns:
+                return nome_legacy
 
         return None
 
