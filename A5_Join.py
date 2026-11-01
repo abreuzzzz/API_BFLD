@@ -251,6 +251,7 @@ if len(colunas_centro_custo) > 0 and len(colunas_valor) > 0:
 
         subset['paid_new'] = subset['paid_new'].apply(parse_valor_brl)
         subset = subset.dropna(subset=['paid_new'])
+        subset['paid_new'] = subset['paid_new'].abs()
 
         registros_pivotados.append(subset)
 
