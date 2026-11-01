@@ -22,6 +22,33 @@ planilhas_ids = {
     "Financeiro_Completo_BFLD": "1w9k30vrjDG7_0yWZ8_ehMp9GpgkJ4QqWpvt6i7GG8P8"
 }
 
+# === Conversão de valores em moeda em BRL ===
+def parse_valor_brl(valor):
+    if pd.isna(valor):
+        return pd.NA
+
+    if isinstance(valor, str):
+        valor = valor.strip()
+        if valor in ('', 'nan', 'NaN', 'None', '-'):
+            return pd.NA
+
+        valor = valor.replace(' ', '')
+        if valor.startswith('(') and valor.endswith(')'):
+            valor = '-' + valor[1:-1]
+
+        if ',' in valor and '.' in valor:
+            if valor.rfind(',') > valor.rfind('.'):
+                valor = valor.replace('.', '').replace(',', '.')
+            else:
+                valor = valor.replace(',', '')
+        elif ',' in valor:
+            valor = valor.replace(',', '.')
+
+    try:
+        return float(valor)
+    except (TypeError, ValueError):
+        return pd.NA
+
 # === Função para abrir e ler planilha por ID ===
 def ler_planilha_por_id(nome_arquivo):
     planilha = client.open_by_key(planilhas_ids[nome_arquivo])
@@ -194,7 +221,7 @@ if len(colunas_centro_custo) > 0 and len(colunas_valor) > 0:
             subset['Centro_de_Custo_Unificado'].astype(str).str.strip().ne('nan')
         ]
 
-        subset['paid_new'] = pd.to_numeric(subset['paid_new'], errors='coerce')
+        subset['paid_new'] = subset['paid_new'].apply(parse_valor_brl)
         subset = subset.dropna(subset=['paid_new'])
 
         registros_pivotados.append(subset)
