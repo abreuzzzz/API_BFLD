@@ -174,73 +174,63 @@ print(f"  Encontradas {len(colunas_valor)} colunas de valor")
 if len(colunas_centro_custo) > 0 and len(colunas_valor) > 0:
     # Cria lista com todas as outras colunas que não são centro de custo
     colunas_id = [col for col in df_completo.columns if col not in colunas_centro_custo + colunas_valor]
-    
-    # Adiciona índice único para facilitar o merge
+
+    # Adiciona índice único para facilitar a montagem por linha
     df_completo_indexed = df_completo.reset_index(drop=False)
     df_completo_indexed = df_completo_indexed.rename(columns={'index': 'row_id'})
-    
-    # Atualiza colunas_id para incluir row_id
-    colunas_id_merge = ['row_id'] + colunas_id
-    
-    # Melt dos centros de custo
-    df_melted_cc = pd.melt(
-        df_completo_indexed,
-        id_vars=colunas_id_merge,
-        value_vars=colunas_centro_custo,
-        var_name='Centro_de_Custo_Temp',
-        value_name='Centro_de_Custo_Unificado'
-    )
-    
-    # Melt dos valores
-    df_melted_valor = pd.melt(
-        df_completo_indexed,
-        id_vars=colunas_id_merge,
-        value_vars=colunas_valor,
-        var_name='Valor_Temp',
-        value_name='paid_new'
-    )
-    
-    # Extrai o número do centro de custo de cada coluna para fazer o match
-    df_melted_cc['num'] = df_melted_cc['Centro_de_Custo_Temp'].str.extract(r'(\d+)$').astype(int)
-    df_melted_valor['num'] = df_melted_valor['Valor_Temp'].str.extract(r'(\d+)$').astype(int)
-    
-    # Junta os dois dataframes pelo row_id e número do centro de custo
-    df_final = df_melted_cc.merge(
-        df_melted_valor[['row_id', 'num', 'paid_new']],
-        on=['row_id', 'num'],
-        how='left'
-    )
-    
-    # Remove colunas temporárias
-    df_final = df_final.drop(columns=['Centro_de_Custo_Temp', 'row_id', 'num'])
-    
-    # Converte valores negativos em positivos
-    if 'paid_new' in df_final.columns:
-        df_final['paid_new'] = pd.to_numeric(df_final['paid_new'], errors='coerce')
-        df_final['paid_new'] = df_final['paid_new'].abs()
-        print("  ✅ Valores negativos convertidos para positivos")
+
+    # Monta os pares (Centro de Custo, Valor) sem repetir toda a linha da transação
+    registros_pivotados = []
+    for idx, col_centro in enumerate(colunas_centro_custo, start=1):
+        col_valor = f"Valor no Centro de Custo {idx}"
+        if col_valor not in df_completo_indexed.columns:
+            continue
+
+        subset = df_completo_indexed[[*colunas_id, 'row_id', col_centro, col_valor]].copy()
+        subset = subset.rename(columns={col_centro: 'Centro_de_Custo_Unificado', col_valor: 'paid_new'})
+
+        subset = subset[
+            subset['Centro_de_Custo_Unificado'].astype(str).str.strip().ne('') &
+            subset['Centro_de_Custo_Unificado'].astype(str).str.strip().ne('nan')
+        ]
+
+        subset['paid_new'] = pd.to_numeric(subset['paid_new'], errors='coerce')
+        subset = subset.dropna(subset=['paid_new'])
+
+        registros_pivotados.append(subset)
+
+    if registros_pivotados:
+        df_final = pd.concat(registros_pivotados, ignore_index=True)
+        df_final = df_final.drop_duplicates(subset=['row_id', 'Centro_de_Custo_Unificado', 'paid_new'], keep='first')
+        df_final = df_final.drop(columns=['row_id'])
+    else:
+        df_final = pd.DataFrame()
+
+    print(f"  ✅ Registros pivotados montados. Total final: {len(df_final)}")
 
     # Remove linhas com NaN na coluna Centro_de_Custo_Unificado
-    df_final = df_final.dropna(subset=['Centro_de_Custo_Unificado'])
+    if not df_final.empty:
+        df_final = df_final.dropna(subset=['Centro_de_Custo_Unificado'])
+        df_final = df_final[
+            (df_final['Centro_de_Custo_Unificado'].astype(str).str.strip() != '') &
+            (df_final['Centro_de_Custo_Unificado'].astype(str).str.strip() != 'nan')
+        ]
 
-    # Remove strings vazias e 'nan' como string
-    df_final = df_final[
-        (df_final['Centro_de_Custo_Unificado'].astype(str).str.strip() != '') & 
-        (df_final['Centro_de_Custo_Unificado'].astype(str).str.strip() != 'nan')
-    ]
+    print(f"  ✅ Linhas após limpeza: {len(df_final)}")
 
-    print(f"  ✅ Linhas com NaN removidas. Total de registros após limpeza: {len(df_final)}")
-    
     # Cria nova aba ou atualiza aba existente
     try:
         aba_pivotada = planilha_saida.worksheet("Dados_Pivotados")
         aba_pivotada.clear()
     except:
-        aba_pivotada = planilha_saida.add_worksheet(title="Dados_Pivotados", rows=len(df_final)+1, cols=len(df_final.columns))
-    
-    set_with_dataframe(aba_pivotada, df_final)
-    print("✅ Planilha pivotada criada/atualizada com sucesso!")
-    print(f"📋 Total de colunas na planilha pivotada: {len(df_final.columns)}")
+        aba_pivotada = planilha_saida.add_worksheet(title="Dados_Pivotados", rows=max(1, len(df_final)+1), cols=max(1, len(df_final.columns) if not df_final.empty else 1))
+
+    if not df_final.empty:
+        set_with_dataframe(aba_pivotada, df_final)
+        print("✅ Planilha pivotada criada/atualizada com sucesso!")
+        print(f"📋 Total de colunas na planilha pivotada: {len(df_final.columns)}")
+    else:
+        print("⚠️ Nenhum registro válido para gravar na aba Dados_Pivotados")
 else:
     print("⚠️ Nenhuma coluna de centro de custo encontrada para pivotagem")
 
