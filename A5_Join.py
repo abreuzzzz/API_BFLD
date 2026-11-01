@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import gspread
 import pandas as pd
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
@@ -206,11 +207,28 @@ if len(colunas_centro_custo) > 0 and len(colunas_valor) > 0:
     df_completo_indexed = df_completo.reset_index(drop=False)
     df_completo_indexed = df_completo_indexed.rename(columns={'index': 'row_id'})
 
+    def localizar_coluna_valor(centro_col):
+        sufixo = centro_col.replace('Centro de Custo ', '', 1).strip()
+        candidatos = [
+            f'Valor no Centro de Custo {sufixo}',
+            f'Valor no Centro de Custo {sufixo.replace(".", ".")}'
+        ]
+
+        for nome in candidatos:
+            if nome in df_completo_indexed.columns:
+                return nome
+
+        for nome in df_completo_indexed.columns:
+            if nome.startswith('Valor no Centro de Custo ') and nome.endswith(sufixo):
+                return nome
+
+        return None
+
     # Monta os pares (Centro de Custo, Valor) sem repetir toda a linha da transação
     registros_pivotados = []
-    for idx, col_centro in enumerate(colunas_centro_custo, start=1):
-        col_valor = f"Valor no Centro de Custo {idx}"
-        if col_valor not in df_completo_indexed.columns:
+    for col_centro in colunas_centro_custo:
+        col_valor = localizar_coluna_valor(col_centro)
+        if col_valor is None:
             continue
 
         subset = df_completo_indexed[[*colunas_id, 'row_id', col_centro, col_valor]].copy()
