@@ -193,7 +193,7 @@ if not files:
 spreadsheet_id = files[0]['id']
 
 # ===================== Limpar conteúdo anterior da planilha =====================
-print(f"\n🧹 Limpando planilha '{sheet_name}'...")
+print(f"\n🧹 Limpando a planilha '{sheet_name}'...")
 sheets_service.spreadsheets().values().clear(
     spreadsheetId=spreadsheet_id,
     range="A:BA"
