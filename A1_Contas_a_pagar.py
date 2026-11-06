@@ -36,6 +36,7 @@ def call_conta_azul_proxy(payload: dict):
         "headers": {
             "X-Authorization": CONTA_AZUL_TOKEN,
             "Content-Type": "application/json",
+            "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/octet-stream, application/json, */*",
             "Origin": "https://pro.contaazul.com",
             "Referer": "https://pro.contaazul.com/",
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5.2 Safari/605.1.15"
@@ -45,7 +46,16 @@ def call_conta_azul_proxy(payload: dict):
 
     response = requests.post(WORKER_URL, json=request_body, timeout=120)
     response.raise_for_status()
-    return response.content
+    content = response.content
+
+    if not content or not content.startswith(b"PK"):
+        preview = content[:300]
+        raise ValueError(
+            f"Resposta inválida do worker. status={response.status_code}, "
+            f"content_type={response.headers.get('Content-Type')}, preview={preview!r}"
+        )
+
+    return content
 
 
 # Lista de status para processar
