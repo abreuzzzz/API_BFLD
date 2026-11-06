@@ -16,29 +16,34 @@ drive_service = build("drive", "v3", credentials=credentials)
 sheets_service = build("sheets", "v4", credentials=credentials)
 
 # ===================== Configurações =====================
+# Mantém o token no próprio código, mas permite sobrescrever via variável de ambiente.
+CONTA_AZUL_TOKEN = os.getenv("CONTA_AZUL_TOKEN", "c6968774-1ad2-4b1b-b3e4-018de29c648a")
+WORKER_URL = os.getenv("CONTA_AZUL_WORKER_URL", "https://ca.souza-brunoabreu.workers.dev")
+
+if not CONTA_AZUL_TOKEN:
+    raise RuntimeError("Token da Conta Azul não informado.")
+if not WORKER_URL:
+    raise RuntimeError("URL do Cloudflare Worker não informada.")
+
 export_url = "https://services.contaazul.com/finance-pro-reports/v1/financial-statement-view/export"
-WORKER_URL = "https://ca.souza-brunoabreu.workers.dev"
-headers = {
-    'x-authorization': 'c6968774-1ad2-4b1b-b3e4-018de29c648a',
-    'Content-Type': 'application/json',
-    'User-Agent': 'Mozilla/5.0'
-}
 
 
-def fetch_contaazul_export(payload: str):
-    """Chama o Worker para buscar o XLSX da Conta Azul e retorna o conteúdo em bytes."""
-    worker_payload = {
+def call_conta_azul_proxy(payload: dict):
+    """Envia a requisição pela rota do Cloudflare Worker para contornar 403/cors."""
+    request_body = {
         "url": export_url,
         "method": "POST",
         "headers": {
-            "x-authorization": headers['x-authorization'],
+            "X-Authorization": CONTA_AZUL_TOKEN,
             "Content-Type": "application/json",
-            "User-Agent": headers['User-Agent']
+            "Origin": "https://pro.contaazul.com",
+            "Referer": "https://pro.contaazul.com/",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5.2 Safari/605.1.15"
         },
-        "body": json.loads(payload)
+        "body": payload,
     }
 
-    response = requests.post(WORKER_URL, json=worker_payload, timeout=120)
+    response = requests.post(WORKER_URL, json=request_body, timeout=120)
     response.raise_for_status()
     return response.content
 
@@ -54,19 +59,20 @@ all_dataframes = []
 for status_atual in status_list:
     print(f"\n📥 Baixando dados para status: {status_atual}")
 
-    payload = json.dumps({
+    payload = {
         "dateFrom": None,
         "dateTo": None,
         "quickFilter": "ALL",
         "search": "",
         "status": [status_atual],
         "type": ["EXPENSE"]
-    })
+    }
 
     try:
-        xlsx_content = fetch_contaazul_export(payload)
-        xlsx_bytes = BytesIO(xlsx_content)
-        df = pd.read_excel(xlsx_bytes)
+        response_content = call_conta_azul_proxy(payload)
+
+        xlsx_content = BytesIO(response_content)
+        df = pd.read_excel(xlsx_content)
         df['status'] = status_atual
 
         print(f"  ✅ {len(df)} registros baixados para {status_atual}")
