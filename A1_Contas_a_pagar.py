@@ -17,11 +17,31 @@ sheets_service = build("sheets", "v4", credentials=credentials)
 
 # ===================== Configurações =====================
 export_url = "https://services.contaazul.com/finance-pro-reports/v1/financial-statement-view/export"
+WORKER_URL = "https://ca.souza-brunoabreu.workers.dev/"
 headers = {
     'x-authorization': 'c6968774-1ad2-4b1b-b3e4-018de29c648a',
     'Content-Type': 'application/json',
     'User-Agent': 'Mozilla/5.0'
 }
+
+
+def fetch_contaazul_export(payload: str):
+    """Chama o Worker para buscar o XLSX da Conta Azul e retorna o conteúdo em bytes."""
+    worker_payload = {
+        "url": export_url,
+        "method": "POST",
+        "headers": {
+            "x-authorization": headers['x-authorization'],
+            "Content-Type": "application/json",
+            "User-Agent": headers['User-Agent']
+        },
+        "body": json.loads(payload)
+    }
+
+    response = requests.post(WORKER_URL, json=worker_payload, timeout=120)
+    response.raise_for_status()
+    return response.content
+
 
 # Lista de status para processar
 status_list = ["ACQUITTED", "PARTIAL", "PENDING", "LOST", "RENEGOTIATED", "CONCILIATED", "OVERDUE"]
@@ -44,11 +64,9 @@ for status_atual in status_list:
     })
 
     try:
-        response = requests.post(export_url, headers=headers, data=payload)
-        response.raise_for_status()
-
-        xlsx_content = BytesIO(response.content)
-        df = pd.read_excel(xlsx_content)
+        xlsx_content = fetch_contaazul_export(payload)
+        xlsx_bytes = BytesIO(xlsx_content)
+        df = pd.read_excel(xlsx_bytes)
         df['status'] = status_atual
 
         print(f"  ✅ {len(df)} registros baixados para {status_atual}")
