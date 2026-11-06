@@ -49,6 +49,15 @@ def call_conta_azul_proxy(payload: dict):
             f"content_type={response.headers.get('Content-Type')}, preview={preview!r}"
         )
 
+    # Detecta corrupção de binário: bytes inválidos UTF-8 substituídos por U+FFFD
+    # (EF BF BD). Isso acontece quando o worker usa upstream.text() em vez de
+    # arrayBuffer(), destruindo o ZIP/XLSX.
+    if b"\xef\xbf\xbd" in content:
+        raise ValueError(
+            "Arquivo XLSX corrompido: o worker retornou bytes U+FFFD (EF BF BD). "
+            "Corrija o worker para usar upstream.arrayBuffer() em vez de upstream.text()."
+        )
+
     return content
 
 
@@ -193,7 +202,7 @@ if not files:
 spreadsheet_id = files[0]['id']
 
 # ===================== Limpar conteúdo anterior da planilha =====================
-print(f"\n🧹 Limpando a planilha '{sheet_name}'...")
+print(f"\n🧹 Limpando planilha '{sheet_name}'...")
 sheets_service.spreadsheets().values().clear(
     spreadsheetId=spreadsheet_id,
     range="A:BA"
